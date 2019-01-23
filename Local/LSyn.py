@@ -6,10 +6,9 @@ import io
 import hashlib
 import socket
 import configparser
-from Crypto.Cipher import AES
-# from binascii import b2a_hex, a2b_hex
-import base64
 import struct
+import aes
+import time
 
 # 节点基类
 class Node:
@@ -132,8 +131,9 @@ class Client:
 
         self.client_socket.connect(self.address)
 
-        self.aes = AESCrypto()
+        self.aes_local = aes.AESCrypto()
         self.file_tree = FilesTree()
+        self.file_tree.storeFilesLocal()
 
     def getConfig(self):
         config = configparser.ConfigParser()
@@ -141,53 +141,50 @@ class Client:
         ip = config.get('address', 'ip')
         port = int(config.get('address', 'port'))
         self.address = (ip, port)
+        self.local_info = config.get('path', 'store_path')
+
+        self.buff = int(config.get('spilt', 'buff'))
+
 
     def send_files_info(self):
-        self.client_socket.send(self.aes.encrypt_str('file_struct').encode())
+        self.client_socket.send(self.aes_local.encrypt_str('file_struct').encode())
+        time.sleep(0.005)
 
-        for item in self.file_tree.getNodeTree():
-            name_len = len(self.aes.encrypt_str(item.getName()))
-            info = struct.pack(str(name_len) + ''
-            self.client_socket.send().encode())
+        with open(self.local_info,'rb') as f:
+            for line in f:
+                print(line)
+                encrypt_line = self.aes_local.encrypt_bin(line)
+                data_len = len(encrypt_line)
+                packed_data = struct.pack(str(data_len) + 'si', encrypt_line, data_len)
+                self.client_socket.send(packed_data)
+
+    def spiltFile(self):
+        self.client_socket.send(self.aes_local.encrypt_str('file_struct').encode())
+        time.sleep(0.005)
+
+        file_length = os.path.getsize(self.local_info)
+        spilt_num = file_length // self.buff
+        end_length = file_length - spilt_num * self.buff
+        self.client_socket.send(str(spilt_num).encode())
+        time.sleep(0.005)
+
+        with open(self.local_info, 'rb') as f:
+            while True:
+                line = f.read(self.buff)
+                if not line:
+                    break
+                encrypt_line = self.aes_local.encrypt_bin(line)
+                packed_data = struct.pack(str(self.buff) + 's', encrypt_line)
+                self.client_socket.send(packed_data)
+        time.sleep(0.003)
+
+        self.client_socket.send(str(end_length).encode())
 
 
     def packFiles(self):
         pass
 
-
-class AESCrypto:
-    def __init__(self):
-        config = configparser.ConfigParser()
-        config.read('local.ini')
-        self.key = config.get('crypto', 'key')
-
-
-    def add_to_16(self, value):
-        while len(value) % 16 != 0:
-            value += '\0'
-        return str.encode(value)  # 返回bytes
-
-    #英文字符串加密方法
-    def encrypt_str(self, str_text):
-        # 初始化加密器
-        aes = AES.new(self.add_to_16(self.key), AES.MODE_ECB)
-        #先进行aes加密
-        encrypt_aes = aes.encrypt(self.add_to_16(str_text))
-        #用base64转成字符串形式
-        encrypted_text = str(base64.encodebytes(encrypt_aes), encoding='utf-8')  # 执行加密并转码返回bytes
-        return encrypted_text
-
-    #英文字符串解密方法
-    def decrypt_str(self, cipher_text):
-        # 初始化加密器
-        aes = AES.new(self.add_to_16(self.key), AES.MODE_ECB)
-        #优先逆向解密base64成bytes
-        base64_decrypted = base64.decodebytes(cipher_text.encode(encoding='utf-8'))
-        #执行解密密并转码返回str
-        decrypted_text = str(aes.decrypt(base64_decrypted),encoding='utf-8').replace('\0','')
-        return decrypted_text
-
-
 if __name__ == '__main__':
     client = Client()
-    client.send_files_info()
+    client.spiltFile()
+
