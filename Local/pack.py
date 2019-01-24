@@ -11,10 +11,15 @@ import struct
 # print(type(unpack_data[0]))
 # print(unpack_data[0])
 
+a = 1
+b = 2
+pack = struct.pack('ii', a,b)
+unpack = struct.unpack('ii', pack)
+print(unpack)
 
-
-i = b'dn'
-length = len(i)
-pack_data = struct.pack(str(length) + 'si',i,length)
-unpack_data = struct.unpack(str(length) + 'si', pack_data)
-print(unpack_data)
+#
+# i = b'dn'
+# length = len(i)
+# pack_data = struct.pack(str(length) + 'si',i,length)
+# unpack_data = struct.unpack(str(length) + 'si', pack_data)
+# print(unpack_data)
