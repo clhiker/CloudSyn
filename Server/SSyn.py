@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import socket
-import time
 import configparser
 import threading
-import os
+import time
+
+import load
 import aes
-import struct
+import filetree
 
 
 class Server:
@@ -16,6 +17,7 @@ class Server:
         self.buff = 1024
         self.home_path = ''
         self.store_path = ''
+        self.client = None
 
         # 读取配置文件
         self.readConfig()
@@ -27,7 +29,13 @@ class Server:
 
         self.aes_remote = aes.AESCrypto()
 
+        self.file_tree = filetree.FileTree()
+        self.file_tree.setStorePath(self.store_path)
+        self.file_tree.setHomePath(self.home_path)
+
         self.download_list = []
+
+        self.load_gerenator = load.Load(self.buff)
 
     # 读取配置信息
     def readConfig(self):
@@ -45,114 +53,56 @@ class Server:
 
         self.store_path = config.get('path', 'store_path')
 
-    def receiveFilesInfo(self, client):
-        self.download(client, self.store_path)
-        self.readFileStruct()
+    def receiveFilesInfo(self):
+        self.load_gerenator.download(self.store_path)
+        self.transDifferent()
 
-    # 检查文件目录结构信息
-    def readFileStruct(self):
+    def transDifferent(self):
+        self.file_tree.clearDownloadList()
+        self.file_tree.readFileStruct()
+        self.file_tree.storeFilesRemote()
+        self.download_list = self.file_tree.getDownLoadList()
 
-        count = 0
-        item_type = ''
-        name = ''
-        up_path = self.home_path
-        flag = False
-        with open(self.store_path, 'r') as f:
-            for line in f:
-                if count == 0:
-                    name = line[:line.rfind('\n')]
-                if count == 1:
-                    item_type = line[:line.rfind('\n')]
+        if len(self.download_list) != 0:
+            self.client.send(self.aes_remote.encrypt_str('syn').encode())
+            time.sleep(0.005)
+            self.load_gerenator.upload(self.store_path)
 
-                    if item_type == 'dir':
-                        self.checkDir(up_path, name)
-                        up_path = up_path + os.sep + name
-                        flag = True
-                    else:
-                        self.checkFile(up_path, name)
+            self.synFiles()
 
-                    count = 0
-                count += 1
-
-    def addFile(self, up_path, name):
-        path = up_path + os.sep + name
-        path = path.replace(self.home_path, '')
-        self.download_list.append(('file', path))
-
-    def checkFile(self, up_path, name):
-        files_list = os.listdir(up_path)
-        if name not in files_list:
-            path = up_path + os.sep + name
-            path = path.replace(self.home_path, '')
-            self.download_list.append(('file', path))
-
-    def checkDir(self, up_path, name):
-        files_list = os.listdir(up_path)
-        if name not in files_list:
-            path = up_path + os.sep + name
-            path = path.replace(self.home_path, '')
-            self.download_list.append(('dir', path))
-
-
-    def download(self, client, filename):
-        if os.path.exists(filename):
-            os.remove(filename)
-        file_length_info = self.aes_remote.decrypt_bin(client.recv(self.buff))
-        (spilt_num, end_length) = struct.unpack('ii', file_length_info)
-
-        line = b''
-        count = 0
+    def synFiles(self):
         while True:
-            line += client.recv(self.buff)
-            spilt_line = line[:self.buff]
-            line = line[self.buff:]
-            decrypt_line = self.aes_remote.decrypt_bin(spilt_line)
+            stop_info = self.aes_remote.decrypt_str(self.client.recv(self.buff).decode())
+            if stop_info == 'stop':
+                break
+            part_path = self.aes_remote.decrypt_str(self.client.recv(self.buff).decode())
 
-            try:
-                if count == spilt_num:
-                    decrypt_line = decrypt_line[:end_length]
-                    with open(filename, 'ab') as f:
-                        f.write(decrypt_line)
-                    break
-                else:
-                    with open(filename, 'ab') as f:
-                        f.write(decrypt_line)
-            except IOError as error:
-                print('File error:' + str(error))
-            count += 1
+            self.client.send(b'yes')
+            file_path = self.home_path + part_path
+            print(file_path)
+            self.load_gerenator.download(file_path)
+            self.client.send(b'yes')
 
-    def receiveState(self, client, receive_info):
+    # 向下同步
+    def DownSyn(self):
+        for item in self.download_list:
+            pass
+
+    def receiveState(self, receive_info):
         # 目录信息
         if receive_info == 'file_struct':
-            self.receiveFilesInfo(client)
+            self.receiveFilesInfo()
 
     def beginInterface(self):
         while True:
-            client, address = self.server_socket.accept()
-            choice = self.aes_remote.decrypt_str(client.recv(self.buff).decode())
+            self.client, address = self.server_socket.accept()
+            self.load_gerenator.setClient(self.client)
+
+            choice = self.aes_remote.decrypt_str(self.client.recv(self.buff).decode())
             print(choice)
 
-            t = threading.Thread(target=self.receiveState, args=(client, choice))
+            t = threading.Thread(target=self.receiveState, args=(choice,))
             t.start()
-
-
-class ItemNode:
-    def __init__(self):
-        self.name = ''
-        self.item_type = ''
-        self.path = ''
-
-    def setName(self, name):
-        self.name = name
-
-    def getName(self):
-        return self.name
-
-    def setType(self, item_type):
-        self.item_type = item_type
-
-    def getType(self):
-        return self.item_type
 
 
 if __name__ == '__main__':

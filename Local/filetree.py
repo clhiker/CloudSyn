@@ -3,6 +3,7 @@ import os
 import hashlib
 import io
 
+
 # 节点基类
 class Node:
     def __init__(self):
@@ -16,7 +17,7 @@ class Node:
     def getName(self):
         return self.name
 
-    def setFather(self,father):
+    def setFather(self, father):
         self.father = father
 
     def getFather(self):
@@ -38,6 +39,9 @@ class FileNode(Node):
 
     def setPath(self, path):
         self.path = path
+
+    def getPath(self):
+        return self.path
 
     def setNode(self):
         self.name = self.path[self.path.rfind('/') + 1:]
@@ -108,12 +112,16 @@ class FileTree:
         return self.node_tree
 
     def storeFilesLocal(self):
+        if os.path.exists(self.local_info):
+            os.remove(self.local_info)
         try:
             with open(self.local_info, 'w') as f:
                 for item in self.node_tree:
-                    f.write(item.getName())
+                    load_path = item.getPath().replace(self.home_path, '')
+                    # print(load_path)
+                    f.write(load_path)
                     f.write('\n')
                     f.write(item.getMd5())
                     f.write('\n')
-        except:
+        except IOError:
             print('文件打开失败')

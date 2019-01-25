@@ -2,6 +2,7 @@ import base64
 from Crypto.Cipher import AES
 import configparser
 import os
+from Crypto import Random
 # str不是16的倍数那就补足为16的倍数
 
 class AESCrypto:

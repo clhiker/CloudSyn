@@ -13,9 +13,11 @@ import struct
 
 a = 1
 b = 2
-pack = struct.pack('ii', a,b)
-unpack = struct.unpack('ii', pack)
-print(unpack)
+c = 'afsd'
+pack = struct.pack('ii4s', a,b,c.encode())
+(a,b,c) = struct.unpack('ii4s', pack)
+c = c.decode()
+print(c)
 
 #
 # i = b'dn'
