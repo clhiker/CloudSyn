@@ -3,13 +3,10 @@
 
 import socket
 import configparser
-import os
 import time
 
-
-import aes
+import Encryptor
 import filetree
-import HashCode
 import load
 
 
@@ -27,11 +24,11 @@ class Client:
 
         self.client_socket.connect(self.address)
 
-        self.aes_local = aes.AESCrypto()
         self.file_tree = filetree.FileTree()
         self.file_tree.storeFilesLocal()
 
-        self.hash_generator = HashCode.MD5()
+        # 初始化加密器
+        self.encryptor_generator = Encryptor.AES_MD5()
 
         self.load_generator = load.Load(self.buff)
         self.load_generator.setClient(self.client_socket)
@@ -49,14 +46,14 @@ class Client:
         self.block_size = int(config.get('spilt', 'block_size'))
 
     def sendFilesInfo(self):
-        self.client_socket.send(self.aes_local.encrypt_str('file_struct').encode())
+        self.client_socket.send(self.encryptor_generator.encrypt_str('file_struct').encode())
         time.sleep(0.005)
 
         self.load_generator.upload(self.local_path)
 
     def waitCheck(self):
         print('check')
-        check_info = self.aes_local.decrypt_str(self.client_socket.recv(self.buff).decode())
+        check_info = self.encryptor_generator.decrypt_str(self.client_socket.recv(self.buff).decode())
 
         if check_info == 'syn':
             self.load_generator.download(self.local_path)
@@ -75,9 +72,10 @@ class Client:
         for item in download_list:
             real_path = self.home_path + item
 
-            self.client_socket.send(self.aes_local.encrypt_str('continue').encode())
+            self.client_socket.send(self.encryptor_generator.encrypt_str('continue').encode())
             time.sleep(0.003)
-            self.client_socket.send(self.aes_local.encrypt_str(item).encode())
+            # 文件名为解决中文问题使用二进制加密
+            self.client_socket.send(self.encryptor_generator.encrypt_bin(item.encode()))
             time.sleep(0.003)
             self.client_socket.recv(self.buff)
 
@@ -87,7 +85,7 @@ class Client:
             self.client_socket.recv(self.buff)
             # print('我走到这一步了')
 
-        self.client_socket.send(self.aes_local.encrypt_str('stop').encode())
+        self.client_socket.send(self.encryptor_generator.encrypt_str('stop').encode())
             
 
 def main():

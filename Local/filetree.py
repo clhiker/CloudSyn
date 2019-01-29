@@ -1,7 +1,6 @@
 import configparser
 import os
-import hashlib
-import io
+import Encryptor
 
 
 # 节点基类
@@ -37,6 +36,9 @@ class FileNode(Node):
         self.path = ''
         self.md5 = ''
 
+        # 初始化加密器
+        self.encryptor_generator = Encryptor.AES_MD5()
+
     def setPath(self, path):
         self.path = path
 
@@ -47,23 +49,10 @@ class FileNode(Node):
         self.name = self.path[self.path.rfind('/') + 1:]
         # 文件
         if not os.path.isdir(self.path):
-            self.setMd5(self.path)
+            self.md5 = self.encryptor_generator.getMd5(self.path)
         # 文件夹
         else:
             self.md5 = 'dir'
-
-    def setMd5(self, path):
-        m = hashlib.md5()
-        try:
-            file = io.FileIO(path, 'r')
-            bytes = file.read(1024)
-            while (bytes != b''):
-                m.update(bytes)
-                bytes = file.read(1024)
-            file.close()
-            self.md5 = m.hexdigest()
-        except:
-            print('没有后缀名')
 
     def getMd5(self):
         return self.md5
