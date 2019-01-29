@@ -1,7 +1,7 @@
 import HashCode
 import aes
 import os
-import struct
+# import struct
 import time
 
 
@@ -24,28 +24,47 @@ class Load:
         end_length = file_length - spilt_num * self.buff
         hash_code = self.hash_generator.getHash(file_path)
 
-        file_info = struct.pack('ii32s', spilt_num, end_length, hash_code.encode())
-        self.client.send(self.aes_generator.encrypt_bin(file_info))
+        self.client.send(self.aes_generator.encrypt_str(str(spilt_num)).encode())
+        time.sleep(0.005)
+        self.client.send(self.aes_generator.encrypt_str(str(end_length)).encode())
+        time.sleep(0.005)
+        self.client.send(self.aes_generator.encrypt_str(hash_code).encode())
         time.sleep(0.005)
 
-        with open(file_path, 'rb') as f:
-            while True:
-                line = f.read(self.buff)
-                if not line:
-                    break
-                encrypt_line = self.aes_generator.encrypt_bin(line)
-                self.client.send(encrypt_line)
-                # print('我也许卡死了')
+        # file_info = struct.pack('ii32s', spilt_num, end_length, hash_code.encode())
+        # self.client.send(self.aes_generator.encrypt_bin(file_info))
+        # time.sleep(0.005)
+        print(spilt_num)
+        print(end_length)
+        print(hash_code)
 
-        # print('我走到这里')
+        try:
+            with open(file_path, 'rb') as f:
+                while True:
+                    line = f.read(self.buff)
+                    if not line:
+                        break
+                    encrypt_line = self.aes_generator.encrypt_bin(line)
+                    self.client.send(encrypt_line)
+
+        except IOError as error:
+            print('upload error:' + str(error))
+       #  print('我跳出了')
 
     def download(self, file_path):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-        file_info = self.aes_generator.decrypt_bin(self.client.recv(self.buff))
-        (spilt_num, end_length, hash_code) = struct.unpack('ii32s', file_info)
-        remote_hash_code = hash_code.decode()
+        # file_info = self.aes_generator.decrypt_bin(self.client.recv(self.buff))
+        # (spilt_num, end_length, hash_code) = struct.unpack('ii32s', file_info)
+        # remote_hash_code = hash_code.decode()
+        spilt_num = int(self.aes_generator.decrypt_str(self.client.recv(self.buff).decode()))
+        end_length = int(self.aes_generator.decrypt_str(self.client.recv(self.buff).decode()))
+        remote_hash_code = self.aes_generator.decrypt_str(self.client.recv(self.buff).decode())
+
+        print(spilt_num)
+        print(end_length)
+        print(remote_hash_code)
 
         line = b''
         count = 0
@@ -56,6 +75,8 @@ class Load:
             line += self.client.recv(block)
             spilt_line = line[:block]
             line = line[block:]
+            if not spilt_line:
+                break
             decrypt_line = self.aes_generator.decrypt_bin(spilt_line)
 
             try:
@@ -68,9 +89,7 @@ class Load:
                     with open(file_path, 'ab') as f:
                         f.write(decrypt_line)
             except IOError as error:
-                print('File error:' + str(error))
+                print('download error:' + str(error))
             count += 1
 
         local_hash_code = self.hash_generator.getHash(file_path)
-        # if local_hash_code != remote_hash_code:
-        #     self.download(file_path)

@@ -6,6 +6,7 @@ import configparser
 import os
 import time
 
+
 import aes
 import filetree
 import HashCode
@@ -54,6 +55,7 @@ class Client:
         self.load_generator.upload(self.local_path)
 
     def waitCheck(self):
+        print('check')
         check_info = self.aes_local.decrypt_str(self.client_socket.recv(self.buff).decode())
 
         if check_info == 'syn':
@@ -81,13 +83,30 @@ class Client:
 
             print(real_path)
             self.load_generator.upload(real_path)
+            # print('我在这等着')
             self.client_socket.recv(self.buff)
+            # print('我走到这一步了')
 
         self.client_socket.send(self.aes_local.encrypt_str('stop').encode())
             
-                
-if __name__ == '__main__':
+
+def main():
     client = Client()
     client.sendFilesInfo()
     client.waitCheck()
 
+if __name__ == '__main__':
+
+    config = configparser.ConfigParser()
+    config.read('local.ini')
+    time_stamp = int(config.get('config', 'time_stamp'))
+
+    old_time = time.time()
+    new_time = time.time()
+    while True:
+        new_time = time.time()
+        if new_time - old_time > time_stamp:
+            main()
+            old_time = time.time()
+        else:
+            pass

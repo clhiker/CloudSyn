@@ -1,4 +1,3 @@
-
 import HashCode
 import os
 
@@ -8,6 +7,8 @@ class FileTree:
         self.store_path = ''
         self.home_path = ''
         self.download_list = []
+        self.local_files_list = []
+        self.remove_list = []
         self.hash_generator = HashCode.MD5()
 
     def clearDownloadList(self):
@@ -22,8 +23,14 @@ class FileTree:
     def getDownLoadList(self):
         return self.download_list
 
+    def clearLocalFilesList(self):
+        self.local_files_list = []
+
     # 检查文件目录结构信息
     def readFileStruct(self):
+
+        self.clearLocalFilesList()
+
         count = 0
         part_path = ''
         real_path = ''
@@ -31,6 +38,7 @@ class FileTree:
             for line in f:
                 if count == 0:
                     part_path = line[:line.rfind('\n')]
+                    part_path = self.transPath(part_path)
                     real_path = self.home_path + part_path
 
                 if count == 1:
@@ -39,22 +47,13 @@ class FileTree:
                     if item_type == 'dir':
                         self.checkDir(real_path)
                     else:
+                        self.local_files_list.append(part_path)
+
                         self.checkFile(real_path, part_path, item_type)
 
                     count = -1
 
                 count += 1
-
-    def storeFilesRemote(self):
-        if os.path.exists(self.store_path):
-            os.remove(self.store_path)
-        try:
-            with open(self.store_path, 'w') as f:
-                for item in self.download_list:
-                    f.write(item)
-                    f.write('\n')
-        except IOError:
-            print('文件打开失败')
 
     def checkFile(self, real_path, part_path, md5):
         if not os.path.exists(real_path):
@@ -69,21 +68,52 @@ class FileTree:
         if not os.path.exists(real_path):
             os.mkdir(real_path)
 
+    # 存储要上传的文件
+    def storeFilesRemote(self):
+        if os.path.exists(self.store_path):
+            os.remove(self.store_path)
+        try:
+            with open(self.store_path, 'w') as f:
+                for item in self.download_list:
+                    f.write(item)
+                    f.write('\n')
+        except IOError:
+            print('文件打开失败')
 
+    # 移除多余的文件
+    def removeRecursiveFiles(self):
+        self.recursiveTraversal(self.home_path)
 
+        print('移除文件目录')
+        print(self.remove_list)
 
+        for item in self.remove_list:
+            if os.path.exists(item):
+                os.remove(item)
+                print(item)
 
+    def recursiveTraversal(self, file_path):
+        files_list = os.listdir(file_path)
+        for item in files_list:
+            real_path = file_path + os.sep + item
+            if os.path.isdir(real_path):
+                self.recursiveTraversal(real_path)
+            else:
+                part_path = real_path.replace(self.home_path, '')
+                if part_path not in self.local_files_list:
+                    self.remove_list.append(real_path)
 
+    # 本地文件系统修改
+    def transPath(self, path):
+        if path.find('\\') != -1:
+            path_list = path.split('\\')
+            new_path = path_list[0]
+            for index in range(1, len(path_list)):
+                new_path += (os.sep + path_list[index])
+        else:
+            path_list = path.split('/')
+            new_path = path_list[0]
+            for index in range(1, len(path_list)):
+                new_path += os.sep + path_list[index]
 
-
-
-
-
-
-
-
-
-
-
-
-
+        return new_path

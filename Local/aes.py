@@ -52,27 +52,16 @@ class AESCrypto:
 
 if __name__ == '__main__':
 
-    # aes = AESCrypto()
-    # test = aes.encrypt_str('lihuizhizhang')
-    # print(test)
-    # print(aes.decrypt_str(test))
-    # test2 = aes.encrypt_bin(b'lihuizhiahz=')
-    # print(test2)
-    # print(aes.decrypt_bin(test2)[16:])
-
     aes = AESCrypto()
     test2 = []
-    with open('/home/jerry/Test/Local/local_info.txt', 'rb') as f:
+    with open('/home/jerry/Test/Local/1.flac', 'rb') as f:
         for line in f:
             test = aes.encrypt_bin(line)
             print(len(test))
             test2.append(test)
 
-    with open('/home/jerry/Test/Remote/remote_info.txt', 'wb') as f:
+    with open('/home/jerry/Test/Remote/1.flac', 'wb') as f:
         for item in test2:
             result = aes.decrypt_bin(item)
             f.write(result)
-
     pass
-
-

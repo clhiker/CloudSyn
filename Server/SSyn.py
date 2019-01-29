@@ -12,6 +12,7 @@ import filetree
 class Server:
     def __init__(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # self.server_socket.settimeout(3)
         self.address = ()
         self.max_supported_devices = 3
         self.buff = 1024
@@ -57,10 +58,13 @@ class Server:
         self.load_gerenator.download(self.store_path)
         self.transDifferent()
 
+    # 同步接口
     def transDifferent(self):
         self.file_tree.clearDownloadList()
         self.file_tree.readFileStruct()
         self.file_tree.storeFilesRemote()
+        # 移除多余的文件
+        self.file_tree.removeRecursiveFiles()
         self.download_list = self.file_tree.getDownLoadList()
 
         if len(self.download_list) != 0:
@@ -70,6 +74,7 @@ class Server:
 
             self.synFiles()
 
+    # 同步文件
     def synFiles(self):
         while True:
             stop_info = self.aes_remote.decrypt_str(self.client.recv(self.buff).decode())
@@ -81,12 +86,9 @@ class Server:
             file_path = self.home_path + part_path
             print(file_path)
             self.load_gerenator.download(file_path)
+            # print('我走到这一步了')
+            time.sleep(0.005)
             self.client.send(b'yes')
-
-    # 向下同步
-    def DownSyn(self):
-        for item in self.download_list:
-            pass
 
     def receiveState(self, receive_info):
         # 目录信息

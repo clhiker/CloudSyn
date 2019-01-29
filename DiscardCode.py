@@ -173,3 +173,12 @@
 #
 #     except IOError as error:
 #         print('File error:' + str(error))
+
+
+if __name__ == '__main__':
+
+    schedule = BlockingScheduler()
+    schedule.add_job(main, 'interval', seconds=3)
+    schedule.start()
+
+
