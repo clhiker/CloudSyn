@@ -1,5 +1,6 @@
-import HashCode
+import Encryptor
 import os
+import shutil
 
 
 class FileTree:
@@ -9,7 +10,9 @@ class FileTree:
         self.download_list = []
         self.local_files_list = []
         self.remove_list = []
-        self.hash_generator = HashCode.MD5()
+        
+        # 初始化加密器
+        self.encryptor_generator = Encryptor.AES_MD5()
 
     def clearDownloadList(self):
         self.download_list = []
@@ -25,6 +28,9 @@ class FileTree:
 
     def clearLocalFilesList(self):
         self.local_files_list = []
+
+    def clearRemoveList(self):
+        self.remove_list = []
 
     # 检查文件目录结构信息
     def readFileStruct(self):
@@ -46,6 +52,7 @@ class FileTree:
 
                     if item_type == 'dir':
                         self.checkDir(real_path)
+                        self.local_files_list.append(part_path)
                     else:
                         self.local_files_list.append(part_path)
 
@@ -60,12 +67,12 @@ class FileTree:
             self.download_list.append(part_path)
 
         else:
-            self.hash_generator.setMd5(real_path)
-            if self.hash_generator.getMd5() != md5:
+            if self.encryptor_generator.getMd5(real_path) != md5:
                 self.download_list.append(part_path)
 
     def checkDir(self, real_path):
         if not os.path.exists(real_path):
+            # os.makedirs(real_path)
             os.mkdir(real_path)
 
     # 存储要上传的文件
@@ -82,6 +89,7 @@ class FileTree:
 
     # 移除多余的文件
     def removeRecursiveFiles(self):
+        self.clearRemoveList()
         self.recursiveTraversal(self.home_path)
 
         print('移除文件目录')
@@ -90,14 +98,17 @@ class FileTree:
         for item in self.remove_list:
             if os.path.exists(item):
                 os.remove(item)
-                print(item)
 
     def recursiveTraversal(self, file_path):
         files_list = os.listdir(file_path)
         for item in files_list:
             real_path = file_path + os.sep + item
             if os.path.isdir(real_path):
-                self.recursiveTraversal(real_path)
+                part_path = real_path.replace(self.home_path, '')
+                if part_path not in self.local_files_list:
+                    shutil.rmtree(real_path)  # 递归删除文件夹
+                else:
+                    self.recursiveTraversal(real_path)
             else:
                 part_path = real_path.replace(self.home_path, '')
                 if part_path not in self.local_files_list:

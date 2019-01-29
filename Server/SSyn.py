@@ -5,7 +5,7 @@ import threading
 import time
 
 import load
-import aes
+import Encryptor
 import filetree
 
 
@@ -28,7 +28,8 @@ class Server:
         # 最多三台设备
         self.server_socket.listen(int(self.max_supported_devices))
 
-        self.aes_remote = aes.AESCrypto()
+        # 初始化加密器
+        self.encryptor_generator = Encryptor.AES_MD5()
 
         self.file_tree = filetree.FileTree()
         self.file_tree.setStorePath(self.store_path)
@@ -56,19 +57,20 @@ class Server:
 
     def receiveFilesInfo(self):
         self.load_gerenator.download(self.store_path)
-        self.transDifferent()
+        self.transDifference()
 
     # 同步接口
-    def transDifferent(self):
+    def transDifference(self):
         self.file_tree.clearDownloadList()
         self.file_tree.readFileStruct()
-        self.file_tree.storeFilesRemote()
         # 移除多余的文件
         self.file_tree.removeRecursiveFiles()
+
+        self.file_tree.storeFilesRemote()
         self.download_list = self.file_tree.getDownLoadList()
 
         if len(self.download_list) != 0:
-            self.client.send(self.aes_remote.encrypt_str('syn').encode())
+            self.client.send(self.encryptor_generator.encrypt_str('syn').encode())
             time.sleep(0.005)
             self.load_gerenator.upload(self.store_path)
 
@@ -77,10 +79,10 @@ class Server:
     # 同步文件
     def synFiles(self):
         while True:
-            stop_info = self.aes_remote.decrypt_str(self.client.recv(self.buff).decode())
+            stop_info = self.encryptor_generator.decrypt_str(self.client.recv(self.buff).decode())
             if stop_info == 'stop':
                 break
-            part_path = self.aes_remote.decrypt_str(self.client.recv(self.buff).decode())
+            part_path = self.encryptor_generator.decrypt_bin(self.client.recv(self.buff)).decode()
 
             self.client.send(b'yes')
             file_path = self.home_path + part_path
@@ -100,7 +102,7 @@ class Server:
             self.client, address = self.server_socket.accept()
             self.load_gerenator.setClient(self.client)
 
-            choice = self.aes_remote.decrypt_str(self.client.recv(self.buff).decode())
+            choice = self.encryptor_generator.decrypt_str(self.client.recv(self.buff).decode())
             print(choice)
 
             t = threading.Thread(target=self.receiveState, args=(choice,))
